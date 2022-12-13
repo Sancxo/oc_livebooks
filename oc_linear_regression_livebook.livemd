@@ -7,7 +7,9 @@ Mix.install([
 ])
 ```
 
-## Getting the data from CSV file
+## Récupérer les données depuis le CSV
+
+On utilise la librairie _NimbleCSV_ pour parser le fichier CSV, puis on stocke les valeurs dans une liste formattée pour la librairie _Vega_ (des maps avec les clés `loyer` et `surface` : les noms de futurs axes du futur graphique).
 
 ```elixir
 NimbleCSV.define(CSVParser, separator: ",", escape: "\r\n")
@@ -21,42 +23,44 @@ csv =
   end)
 ```
 
-```elixir
-[loyers, surfaces] =
-  csv
-  |> Enum.reduce([[], []], fn %{loyer: loyer, surface: surface},
-                              [loyer_list | [surface_list | _tail]] ->
-    [[loyer | loyer_list], [surface | surface_list]]
-  end)
+On enlève les __valeurs aberrantes__ ; ici il s'agit des loyers supérieurs à __10 000€__.
 
-linear_regression = [
-  %{
-    x: loyers |> Enum.min(),
-    y: surfaces |> Enum.min()
-  },
-  %{
-    x: loyers |> Enum.max(),
-    y: surfaces |> Enum.max()
-  }
-]
+```elixir
+csv =
+  csv
+  |> Enum.filter(fn %{loyer: loyer, surface: _surface} -> loyer < 10000 end)
 ```
 
-<!-- livebook:{"attrs":{"chart_title":"house_chart","height":500,"layers":[{"chart_type":"point","color_field":"loyer","color_field_aggregate":null,"color_field_bin":false,"color_field_scale_scheme":"accent","color_field_type":"quantitative","data_variable":"csv","x_field":"surface","x_field_aggregate":null,"x_field_bin":false,"x_field_scale_type":null,"x_field_type":"quantitative","y_field":"loyer","y_field_aggregate":null,"y_field_bin":false,"y_field_scale_type":null,"y_field_type":"quantitative"},{"chart_type":"line","color_field":"__count__","color_field_aggregate":null,"color_field_bin":false,"color_field_scale_scheme":null,"color_field_type":null,"data_variable":"linear_regression","x_field":"y","x_field_aggregate":null,"x_field_bin":false,"x_field_scale_type":null,"x_field_type":"quantitative","y_field":"x","y_field_aggregate":null,"y_field_bin":false,"y_field_scale_type":null,"y_field_type":"quantitative"}],"vl_alias":"Elixir.VegaLite","width":750},"chunks":null,"kind":"Elixir.KinoVegaLite.ChartCell","livebook_object":"smart_cell"} -->
+## Générer le graphique avec Vega
 
 ```elixir
 VegaLite.new(width: 750, height: 500, title: "house_chart")
+|> VegaLite.data_from_values(csv, only: ["surface", "loyer"])
+|> VegaLite.mark(:point, filled: true, color: :green)
+|> VegaLite.encode_field(:x, "surface", type: :quantitative)
+|> VegaLite.encode_field(:y, "loyer", type: :quantitative)
+```
+
+_Vega_ nous permet déjà de tracer la __régression linéaire__ à partir des données issues du fichier CSV, en ajoutant simplement un nouveau layer contenant la fonction `transform`.
+
+```elixir
+VegaLite.new(width: 750, height: 500, title: "house_chart")
+|> VegaLite.data_from_values(csv, only: ["surface", "loyer"])
 |> VegaLite.layers([
   VegaLite.new()
-  |> VegaLite.data_from_values(csv, only: ["surface", "loyer"])
-  |> VegaLite.mark(:point)
+  |> VegaLite.mark(:point, filled: true, color: :green)
+  |> VegaLite.encode_field(:x, "surface", type: :quantitative)
+  |> VegaLite.encode_field(:y, "loyer", type: :quantitative),
+  VegaLite.new()
+  |> VegaLite.mark(:line, color: :tomato)
+  |> VegaLite.transform(regression: "loyer", on: "surface")
   |> VegaLite.encode_field(:x, "surface", type: :quantitative)
   |> VegaLite.encode_field(:y, "loyer", type: :quantitative)
-  |> VegaLite.encode_field(:color, "loyer", type: :quantitative, scale: [scheme: "accent"]),
-  VegaLite.new()
-  |> VegaLite.data_from_values(linear_regression, only: ["y", "x"])
-  |> VegaLite.mark(:line)
-  |> VegaLite.encode_field(:x, "y", type: :quantitative)
-  |> VegaLite.encode_field(:y, "x", type: :quantitative)
-  |> VegaLite.encode(:color, aggregate: :count)
 ])
+```
+
+## Calculer la droite de régression linéaire
+
+```elixir
+
 ```
