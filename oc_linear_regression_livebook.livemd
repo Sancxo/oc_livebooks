@@ -3,7 +3,8 @@
 ```elixir
 Mix.install([
   {:nimble_csv, "~> 1.2"},
-  {:kino_vega_lite, "~> 0.1.7"}
+  {:kino_vega_lite, "~> 0.1.7"},
+  {:nx, "~> 0.4.1"}
 ])
 ```
 
@@ -44,7 +45,7 @@ VegaLite.new(width: 750, height: 500, title: "house_chart")
 _Vega_ nous permet déjà de tracer la __régression linéaire__ à partir des données issues du fichier CSV, en ajoutant simplement un nouveau layer contenant la fonction `transform`.
 
 ```elixir
-VegaLite.new(width: 750, height: 500, title: "house_chart")
+VegaLite.new(width: 750, height: 500, title: "house_chart_with_linear_regression")
 |> VegaLite.data_from_values(csv, only: ["surface", "loyer"])
 |> VegaLite.layers([
   VegaLite.new()
