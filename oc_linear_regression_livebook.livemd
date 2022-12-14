@@ -22,7 +22,7 @@ NimbleCSV.define(CSVParser, separator: ",", escape: "\r\n")
 csv =
   "house.csv"
   |> File.stream!()
-  |> CSVParser.parse_stream()
+  |> CSVParser.parse_enumerable()
   |> Enum.map(fn [loyer, surface] ->
     %{surface: String.to_integer(surface), loyer: String.to_integer(loyer)}
   end)
@@ -74,7 +74,7 @@ L'`Enum.reduce/3` nous permet ensuite de transformer la liste multi-dimensionnel
 csv_tensor =
   "house.csv"
   |> File.stream!()
-  |> CSVParser.parse_stream()
+  |> CSVParser.parse_enumerable()
   |> Enum.map(fn [loyer, surface] ->
     [String.to_integer(loyer), String.to_integer(surface)]
   end)
