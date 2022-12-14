@@ -107,7 +107,7 @@ Nous y retrouvons notre variable `x` à trois reprises, ainsi que `y`.
 
 En langage naturelle, cette équation donne :
 
-`Theta est égal à l'inversion de x transposé multiplié par x, puis multiplié par x transposé, enfin multiplié par y`
+`Theta est égal à l'inversion de x transposé multiplié par x, cette inversion est ensuite multipliée par x transposé, puis multiplié par y.`
 
 Traduisons-la en langage informatique grâce aux fonctions de la librairie __Nx__.
 
