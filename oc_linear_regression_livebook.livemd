@@ -19,7 +19,7 @@ On utilise la librairie __NimbleCSV__ pour parser le fichier CSV, puis on stocke
 ```elixir
 NimbleCSV.define(CSVParser, separator: ",", escape: "\r\n")
 
-csv =
+data =
   "house.csv"
   |> File.stream!()
   |> CSVParser.parse_enumerable()
@@ -31,8 +31,8 @@ csv =
 On enlève les __valeurs aberrantes__ ; ici il s'agit des loyers supérieurs à __10 000€__.
 
 ```elixir
-csv =
-  csv
+data =
+  data
   |> Enum.filter(fn %{loyer: loyer, surface: _surface} -> loyer < 10000 end)
 ```
 
@@ -40,7 +40,7 @@ csv =
 
 ```elixir
 VegaLite.new(width: 750, height: 500, title: "house_chart")
-|> VegaLite.data_from_values(csv, only: ["surface", "loyer"])
+|> VegaLite.data_from_values(data, only: ["surface", "loyer"])
 |> VegaLite.mark(:point, filled: true, color: :green)
 |> VegaLite.encode_field(:x, "surface", type: :quantitative)
 |> VegaLite.encode_field(:y, "loyer", type: :quantitative)
@@ -50,12 +50,15 @@ __Vega__ nous permet déjà de tracer la __régression linéaire__ à partir des
 
 ```elixir
 VegaLite.new(width: 750, height: 500, title: "house_chart_with_linear_regression")
-|> VegaLite.data_from_values(csv, only: ["surface", "loyer"])
+|> VegaLite.data_from_values(data, only: ["surface", "loyer"])
 |> VegaLite.layers([
+  # couche initiale du graphique représentant les données du CSV :
   VegaLite.new()
   |> VegaLite.mark(:point, filled: true, color: :green)
   |> VegaLite.encode_field(:x, "surface", type: :quantitative)
   |> VegaLite.encode_field(:y, "loyer", type: :quantitative),
+
+  # couche du graphique représentant la régression linéaire :
   VegaLite.new()
   |> VegaLite.mark(:line, color: :tomato)
   |> VegaLite.transform(regression: "loyer", on: "surface")
@@ -64,40 +67,89 @@ VegaLite.new(width: 750, height: 500, title: "house_chart_with_linear_regression
 ])
 ```
 
-## Calculer la droite de régression linéaire
+## Calculer la droite de régression linéaire avec Nx
 
-D'abord, on va réimporter le csv sous la forme de __tenseur__ pour pouvoir travailler avec __Nx__. Après avoir parsé le CSV, on utilise `Enum.map/2` pour transformer toutes les chaînes de caractères du fichier en nombres entiers.
+Avant tout calcul, nous allons d'abord retravailler la donnée de `data` - précédemment formattée en liste de _maps_ afin d'être utilisée avec __Vega__ - pour ensuite pouvoir l'utiliser avec __Nx__ (qui créé des __tenseurs__ à partir de nombres entiers et de listes d'entiers à une ou plusieurs dimensions).
 
-L'`Enum.reduce/3` nous permet ensuite de transformer la liste multi-dimensionnelle au bon format (on passe de `[[loyer_1, surface_1], [loyer_2, surface_2], ...]` à `[[loyer_1, loyer_2, ...], [surface_1, surface_2, ...]]`), __tout en filtrant les valeurs aberrantes__ - toujours supérieures à 10 000€ - grâce au _guard_ `when` combiné à la déstructuration de la liste reçue en argument, ainsi qu'au _pattern matching_ sur les signatures d'appel de la fonction anonynme.
+On utilise donc une compréhension `for`, combinée à un `reduce`, afin de transformer toutes les maps de `data` en liste de listes grâce à la destructuration sur chacune de ces maps, ainsi que sur l'accumulateur du `reduce` qui est initialisé en amont pour être une liste bi-dimensionnelle.
 
 ```elixir
-csv_tensor =
-  "house.csv"
-  |> File.stream!()
-  |> CSVParser.parse_enumerable()
-  |> Enum.map(fn [loyer, surface] ->
-    [String.to_integer(loyer), String.to_integer(surface)]
-  end)
-  |> Enum.reduce([[], []], fn
-    [loyer, surface] = _row, [loyer_acc, surface_acc] = _acc when loyer < 10000 ->
-      [[loyer | loyer_acc], [surface | surface_acc]]
+[loyer_list, surface_list] =
+  for %{loyer: loyer, surface: surface} <- data, reduce: [[], []] do
+    [loyer_acc, surface_acc] = _acc -> [[loyer | loyer_acc], [surface | surface_acc]]
+  end
+```
 
-    _row, acc ->
-      acc
-  end)
-  |> Nx.tensor()
+## Premiers tenseurs
+
+En premier lieu, grâce à un générateur sur `loyer_list` encore une fois combiné à un `reduce`, nous crééons une liste de chiffres `1` aussi longue qu'il y a d'éléments dans `surface_list`. Cela car nous voulons ensuite créer une __matrice__ contenant autant de dimensions, chacune étant constituée du chiffre `1` et d'une surface de la liste. Nous appelons cette matrice `x`.
+
+_N.B.: dans la librairie __Nx__, à l'image de __TensorFlow__, la fonction `tensor/2` sert autant à créer un nombre scalaire, qu'un vecteur ou une matrice._
+
+```elixir
+list_of_ones =
+  for _ <- loyer_list, reduce: [] do
+    acc -> [1 | acc]
+  end
+
+x = [list_of_ones, surface_list] |> Nx.tensor() |> Nx.transpose()
+```
+
+Crééons ensuite à partir de la liste des loyers le vecteur - une matrice d'une seule dimension - nommé `y`.
+
+```elixir
+y = loyer_list |> Nx.tensor()
+```
+
+[Le cours d'OpenClassrooms](https://openclassrooms.com/fr/courses/4011851-initiez-vous-au-machine-learning/4121986-programmez-votre-premiere-regression-lineaire#/id/r-4140526) nous donne directement l'équation permettant de calculer la régression linéaire afin d'éviter d'avoir à la calculer : ![](images/linear_regression_function.png)
+
+Nous y retrouvons notre variable `x` à trois reprises, ainsi que `y`.
+
+En langage naturelle, cette équation donne :
+
+`Theta est égal à l'inversion de x transposé multiplié par x, puis multiplié par x transposé, enfin multiplié par y`
+
+Traduisons-la en langage informatique grâce aux fonctions de la librairie __Nx__.
+
+```elixir
+transposed_x = x |> Nx.transpose()
+
+hat_theta =
+  transposed_x
+  |> Nx.dot(x)
+  |> Nx.LinAlg.invert()
+  |> Nx.dot(transposed_x)
+  |> Nx.dot(y)
 ```
 
 ```elixir
-{_first_dimension_rank, first_dimension_length} = csv_tensor |> Nx.shape()
+[hat_theta_0, hat_theta_1] = [hat_theta[0] |> Nx.to_number(), hat_theta[1] |> Nx.to_number()]
 
-tensor_of_ones =
-  [1] |> Nx.tensor(names: [:tensor_of_ones]) |> Nx.pad(1, [{0, first_dimension_length - 1, 0}])
+theta_for_Vega = [
+  %{x: 0, y: hat_theta_0},
+  %{x: 240, y: hat_theta_0 + 240 * hat_theta_1}
+]
+```
 
-import Nx, only: :sigils
+```elixir
+VegaLite.new(
+  width: 750,
+  height: 500,
+  title: "house_data_with_linear_regression_calculated"
+)
+|> VegaLite.layers([
+  # couche initiale du graphique représentant les données du CSV :
+  VegaLite.new()
+  |> VegaLite.data_from_values(data, only: ["surface", "loyer"])
+  |> VegaLite.mark(:point, filled: true, color: :steelblue)
+  |> VegaLite.encode_field(:x, "surface", type: :quantitative)
+  |> VegaLite.encode_field(:y, "loyer", type: :quantitative),
 
-x = ~M<
-    tensor_of_ones
-    csv_tensor[1]
-  >
+  # couche du graphique représentant la régression linéaire :
+  VegaLite.new()
+  |> VegaLite.data_from_values(theta_for_Vega, only: ["x", "y"])
+  |> VegaLite.mark(:line, color: :orange)
+  |> VegaLite.encode_field(:x, "x", type: :quantitative)
+  |> VegaLite.encode_field(:y, "y", type: :quantitative)
+])
 ```
