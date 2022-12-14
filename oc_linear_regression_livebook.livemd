@@ -8,9 +8,13 @@ Mix.install([
 ])
 ```
 
+## Contexte
+
+Dans le cadre du cours "[_Initiez-vous au Machine Learning_](https://openclassrooms.com/fr/courses/4011851-initiez-vous-au-machine-learning)" d'__OpenClassrooms__, nous allons effectuer une __régression linéaire__ à partir d'un fichier CSV à deux colonnes : `loyer` et `surface`.
+
 ## Récupérer les données depuis le CSV
 
-On utilise la librairie _NimbleCSV_ pour parser le fichier CSV, puis on stocke les valeurs dans une liste formattée pour la librairie _Vega_ (des maps avec les clés `loyer` et `surface` : les noms de futurs axes du futur graphique).
+On utilise la librairie __NimbleCSV__ pour parser le fichier CSV, puis on stocke les valeurs dans une liste formattée pour la librairie __Vega__ (des maps avec les clés `loyer` et `surface` : les noms de futurs axes du futur graphique).
 
 ```elixir
 NimbleCSV.define(CSVParser, separator: ",", escape: "\r\n")
@@ -42,7 +46,7 @@ VegaLite.new(width: 750, height: 500, title: "house_chart")
 |> VegaLite.encode_field(:y, "loyer", type: :quantitative)
 ```
 
-_Vega_ nous permet déjà de tracer la __régression linéaire__ à partir des données issues du fichier CSV, en ajoutant simplement un nouveau layer contenant la fonction `transform`.
+__Vega__ nous permet déjà de tracer la __régression linéaire__ à partir des données issues du fichier CSV, en ajoutant simplement un nouveau layer contenant la fonction `transform/2`.
 
 ```elixir
 VegaLite.new(width: 750, height: 500, title: "house_chart_with_linear_regression")
@@ -62,6 +66,38 @@ VegaLite.new(width: 750, height: 500, title: "house_chart_with_linear_regression
 
 ## Calculer la droite de régression linéaire
 
-```elixir
+D'abord, on va réimporter le csv sous la forme de __tenseur__ pour pouvoir travailler avec __Nx__. Après avoir parsé le CSV, on utilise `Enum.map/2` pour transformer toutes les chaînes de caractères du fichier en nombres entiers.
 
+L'`Enum.reduce/3` nous permet ensuite de transformer la liste multi-dimensionnelle au bon format (on passe de `[[loyer_1, surface_1], [loyer_2, surface_2], ...]` à `[[loyer_1, loyer_2, ...], [surface_1, surface_2, ...]]`), __tout en filtrant les valeurs aberrantes__ - toujours supérieures à 10 000€ - grâce au _guard_ `when` combiné à la déstructuration de la liste reçue en argument, ainsi qu'au _pattern matching_ sur les signatures d'appel de la fonction anonynme.
+
+```elixir
+csv_tensor =
+  "house.csv"
+  |> File.stream!()
+  |> CSVParser.parse_stream()
+  |> Enum.map(fn [loyer, surface] ->
+    [String.to_integer(loyer), String.to_integer(surface)]
+  end)
+  |> Enum.reduce([[], []], fn
+    [loyer, surface] = _row, [loyer_acc, surface_acc] = _acc when loyer < 10000 ->
+      [[loyer | loyer_acc], [surface | surface_acc]]
+
+    _row, acc ->
+      acc
+  end)
+  |> Nx.tensor()
+```
+
+```elixir
+{_first_dimension_rank, first_dimension_length} = csv_tensor |> Nx.shape()
+
+tensor_of_ones =
+  [1] |> Nx.tensor(names: [:tensor_of_ones]) |> Nx.pad(1, [{0, first_dimension_length - 1, 0}])
+
+import Nx, only: :sigils
+
+x = ~M<
+    tensor_of_ones
+    csv_tensor[1]
+  >
 ```
