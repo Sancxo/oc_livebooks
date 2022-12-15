@@ -46,7 +46,7 @@ VegaLite.new(width: 750, height: 500, title: "house_chart")
 |> VegaLite.encode_field(:y, "loyer", type: :quantitative)
 ```
 
-__Vega__ nous permet déjà de tracer la __régression linéaire__ à partir des données issues du fichier CSV, en ajoutant simplement un nouveau layer contenant la fonction `transform/2`.
+__Vega__ nous permet déjà de tracer la __régression linéaire__ à partir des données issues du fichier CSV, en ajoutant simplement une nouvelle couche, contenant la fonction `transform/2`, au graphique.
 
 ```elixir
 VegaLite.new(width: 750, height: 500, title: "house_chart_with_linear_regression")
@@ -95,21 +95,23 @@ list_of_ones =
 x = [list_of_ones, surface_list] |> Nx.tensor() |> Nx.transpose()
 ```
 
-Crééons ensuite à partir de la liste des loyers le vecteur - une matrice d'une seule dimension - nommé `y`.
+Crééons ensuite, à partir de la liste des loyers, la matrice à une seule dimension nommée `y`.
 
 ```elixir
 y = loyer_list |> Nx.tensor()
 ```
 
+## Le calcul de la régression linéaire
+
 [Le cours d'OpenClassrooms](https://openclassrooms.com/fr/courses/4011851-initiez-vous-au-machine-learning/4121986-programmez-votre-premiere-regression-lineaire#/id/r-4140526) nous donne directement l'équation permettant de calculer la régression linéaire afin d'éviter d'avoir à la calculer : ![](images/linear_regression_function.png)
 
-Nous y retrouvons notre variable `x` à trois reprises, ainsi que `y`.
+Nous y retrouvons notre matrice `x` à trois reprises, ainsi que `y`.
 
-En langage naturelle, cette équation donne :
+En langage naturel, cette équation donne :
 
-`Theta est égal à l'inversion de x transposé multiplié par x, cette inversion est ensuite multipliée par x transposé, puis multiplié par y.`
+`Theta est égal à l'inverse du produit de x transposé multiplié par x, cette inverse est ensuite multiplié par x transposé, puis multipliée par y.`
 
-Traduisons-la en langage informatique grâce aux fonctions de la librairie __Nx__.
+Traduisons-la maintenant en langage informatique grâce aux fonctions de la librairie __Nx__.
 
 ```elixir
 transposed_x = x |> Nx.transpose()
@@ -121,6 +123,10 @@ hat_theta =
   |> Nx.dot(transposed_x)
   |> Nx.dot(y)
 ```
+
+## Représentation graphique du résultat
+
+Transformons ensuite nos deux entitées de Theta en nombres décimaux afin de les intégrer dans une liste de _maps_ utilisable par __Vega__ pour son graphique.
 
 ```elixir
 [hat_theta_0, hat_theta_1] = [hat_theta[0] |> Nx.to_number(), hat_theta[1] |> Nx.to_number()]
@@ -153,3 +159,15 @@ VegaLite.new(
   |> VegaLite.encode_field(:y, "y", type: :quantitative)
 ])
 ```
+
+## Prédire le loyer pour une surface donnée
+
+Grâce à nos deux variables `hat_theta_0` et `hat_theta_1`, nous pouvons ensuite prédire le loyer de n'importe quelle surface avec le calcul suivant , exemple pour 35m² :
+
+```elixir
+surface = 35
+
+predicted_loyer = hat_theta_1 * surface + hat_theta_0
+```
+
+Un exemple du calcul de la régression linéaire utilisant l'__entraînement supervisé__ pour deviner, puis corriger via l'algorithme de la __descente de gradient__, les valeurs de `hat_theta_0` et `hat_theta_1` est disponible [ici](https://dockyard.com/blog/2021/04/08/up-and-running-nx).
