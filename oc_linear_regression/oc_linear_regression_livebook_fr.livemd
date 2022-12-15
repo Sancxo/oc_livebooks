@@ -20,7 +20,7 @@ On utilise la librairie __NimbleCSV__ pour parser le fichier CSV, puis on stocke
 NimbleCSV.define(CSVParser, separator: ",", escape: "\r\n")
 
 data =
-  "house.csv"
+  "oc_linear_regression/house.csv"
   |> File.stream!()
   |> CSVParser.parse_enumerable()
   |> Enum.map(fn [loyer, surface] ->
@@ -103,7 +103,7 @@ y = loyer_list |> Nx.tensor()
 
 ## Le calcul de la régression linéaire
 
-[Le cours d'OpenClassrooms](https://openclassrooms.com/fr/courses/4011851-initiez-vous-au-machine-learning/4121986-programmez-votre-premiere-regression-lineaire#/id/r-4140526) nous donne directement l'équation permettant de calculer la régression linéaire afin d'éviter d'avoir à la calculer : ![](images/linear_regression_function.png)
+[Le cours d'OpenClassrooms](https://openclassrooms.com/fr/courses/4011851-initiez-vous-au-machine-learning/4121986-programmez-votre-premiere-regression-lineaire#/id/r-4140526) nous donne directement l'équation permettant de calculer la régression linéaire afin d'éviter d'avoir à la calculer : ![](images/linear_regression_equation.png)
 
 Nous y retrouvons notre matrice `x` à trois reprises, ainsi que `y`.
 
