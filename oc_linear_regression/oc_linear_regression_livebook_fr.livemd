@@ -1,4 +1,4 @@
-# OC_linear_regression
+# La régression lineaire en Elixir avec Nx
 
 ```elixir
 Mix.install([
@@ -10,7 +10,7 @@ Mix.install([
 
 ## Contexte
 
-Dans le cadre du cours "[_Initiez-vous au Machine Learning_](https://openclassrooms.com/fr/courses/4011851-initiez-vous-au-machine-learning)" d'__OpenClassrooms__, nous allons effectuer une __régression linéaire__ à partir d'un fichier CSV à deux colonnes : `loyer` et `surface`.
+En nous inpirant du cours "[_Initiez-vous au Machine Learning_](https://openclassrooms.com/fr/courses/4011851-initiez-vous-au-machine-learning)" d'__OpenClassrooms__, nous allons effectuer une __régression linéaire__ à partir du fichier CSV qui nous y est donné, il contient deux colonnes : `loyer` et `surface`.
 
 ## Récupérer les données depuis le CSV
 
