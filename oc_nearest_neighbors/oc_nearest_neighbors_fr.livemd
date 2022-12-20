@@ -1,0 +1,97 @@
+# Le k-NN avec Elixir et Nx
+
+```elixir
+Mix.install([
+  {:nx, "~> 0.4.1"},
+  {:scidata, "~> 0.1.9"}
+])
+```
+
+## Contexte
+
+Dans le même esprit que le [__Livebook__ précédent](https://livebook.dev/run?url=https%3A%2F%2Fraw.githubusercontent.com%2FSancxo%2Foc_livebooks%2Fmain%2Foc_linear_regression%2Foc_linear_regression_livebook_fr.livemd) sur la __régression linéaire__, nous allons reproduire le cours "[_Initiez-vous au Machine Learning_](https://openclassrooms.com/fr/courses/4011851-initiez-vous-au-machine-learning)" d'__OpenClassrooms__ dédié à l'élaboration d'un algorithme ___k Nearest Neighbors___ (_a.k.a._ les x plus proches voisins).
+
+## Récupérer la donnée avec Scidata
+
+L'exercice du cours se base sur le célèbre jeu de données __MNIST__, qui représente un vaste échantillon de chiffres écrits à la main avec leur label respectif.
+
+Nous allons le télécharger via la lirairie __Scidata__, qui permet par avance de télécharger distinctement une partie pour l'entraînement et la seconde pour les tests - __tester le modèle sur le même jeu de données qui a auparavant servi à l'entraînement est contre-productif, car cela amènera _de facto_ et de manière biaisée à de bonnes performances__.
+
+```elixir
+{train_images, train_labels} = Scidata.MNIST.download()
+
+{train_images_binary, train_images_type, train_images_shape} = train_images
+{train_labels_binary, train_labels_type, train_labels_shape} = train_labels
+
+{train_images_shape, train_labels_shape}
+```
+
+```elixir
+{test_images, test_labels} = Scidata.MNIST.download_test()
+
+{test_images_binary, test_images_type, test_images_shape} = test_images
+{test_labels_binary, test_labels_type, test_labels_shape} = test_labels
+
+{test_images_shape, test_labels_shape}
+```
+
+Nous obtenons donc __70 000 images__ (60 000 + 10 000) de __28 pixels sur 28__.
+
+## Préparer les données d'entraînement
+
+Le __k-NN__ est un modèle gourmand en performances qui ne convient qu'à des _petits_ jeux de données. Nous allons donc échantillonné un jeu __aléatoire__ de 5 000 entrées parmis les 60 000 donées d'entraînement initiales.
+
+Commençons par générer 5 000 index pseudos-aléatoires compris entre 0 et 60 000 :
+
+```elixir
+# Le premier nombre sert de clé (seed) aux nombres générés, 
+# j'ai choisi 45 638 653 en tapant au hasard sur mon clavier, 
+# mais il peut être modifié pour générer une liste de nombres totalement différents
+{sample, _new_key} =
+  45_638_653
+  |> Nx.Random.key()
+  |> Nx.Random.randint(0, 60000, shape: {5000})
+
+sample
+```
+
+Ensuite, transformons notre liste de binaires de 28x28 pixels en un __tenseur__ de forme {60000, 1, 28, 28} avec les fonctions `from_binary/2` et `reshape/2`. La fonction `take/2` nous permet enfin de récupérer les 5 000 entrées désirées à partir de notre échantillon d'index générés aléatoirement.
+
+```elixir
+data =
+  train_images_binary
+  |> Nx.from_binary(train_images_type)
+  |> Nx.reshape(train_images_shape)
+  |> Nx.take(sample)
+```
+
+Idem pour les labels, nous récupérons les étiquettes d'entraînement à partir des mêmes index générés précédemment.
+
+```elixir
+data_labels =
+  train_labels_binary
+  |> Nx.from_binary(train_labels_type)
+  |> Nx.take(sample)
+```
+
+Préparons ensuite 1 000 données de test à partir de l'autre jeu, composé initialement de 10 000 données de test :
+
+```elixir
+{test_sample, _new_key} =
+  65_464_154
+  |> Nx.Random.key()
+  |> Nx.Random.randint(0, 10000, shape: {1000})
+
+test_data =
+  test_images_binary
+  |> Nx.from_binary(test_images_type)
+  |> Nx.reshape(test_images_shape)
+  |> Nx.take(test_sample)
+
+test_labels =
+  test_labels_binary
+  |> Nx.from_binary(test_labels_type)
+  |> Nx.take(test_sample)
+```
+
+Nous nous retrouvons au final avec 6 000 entrées, sur les 70 000 originales, avec 80% des données dédiées à l'entraînement et 20% dédiées aux tests.
