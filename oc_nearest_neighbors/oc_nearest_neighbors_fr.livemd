@@ -95,3 +95,7 @@ test_labels =
 ```
 
 Nous nous retrouvons au final avec 6 000 entrées, sur les 70 000 originales, avec 80% des données dédiées à l'entraînement et 20% dédiées aux tests.
+
+## Le k-NN
+
+
